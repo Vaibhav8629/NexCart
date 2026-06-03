@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%; /* #0A0A0A */
+    --foreground: 0 0% 100%;
+    
+    --card: 240 5.9% 10%; /* #18181B */
+    --card-foreground: 0 0% 100%;
+    
+    --popover: 0 0% 6.7%; /* #111111 */
+    --popover-foreground: 0 0% 100%;
+    
+    --primary: 38 92.4% 50.2%; /* #F59E0B */
+    --primary-foreground: 0 0% 6.7%;
+    
+    --secondary: 39 100% 60%; /* #FFB833 */
+    --secondary-foreground: 0 0% 6.7%;
+    
+    --muted: 240 5.9% 10%;
+    --muted-foreground: 240 5% 64.9%; /* #A1A1AA */
+    
+    --accent: 240 5.9% 10%;
+    --accent-foreground: 38 92.4% 50.2%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 240 3.7% 15.9%; /* #27272A */
+    --input: 240 3.7% 15.9%;
+    --ring: 38 92.4% 50.2%;
+    
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border shadow-2xl;
+  }
+  
+  .luxury-gradient {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(10, 10, 10, 0) 100%);
+  }
+  
+  .gold-glow {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors;
+}
+
+/* Auth Pages Fallback */
+.auth-shell {
+  @apply min-h-screen grid place-items-center p-6 luxury-gradient;
+}
+
+.auth-card {
+  @apply w-full max-w-4xl grid md:grid-cols-2 gap-6 p-8 rounded-3xl glass-card;
+}
+
+.auth-form input {
+  @apply w-full px-4 py-3 bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-foreground;
+}
+
+.auth-form button {
+  @apply w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl hover:bg-secondary hover:-translate-y-0.5 transition-all;
+}
+
+.auth-switch a {
+  @apply text-primary font-bold hover:text-secondary;
+}
+
+.app-shell {
+  @apply min-h-screen flex flex-col;
+}
