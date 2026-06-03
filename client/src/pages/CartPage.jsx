@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, ArrowRight, ShoppingBag, Plus, Minus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { useOrder } from '../context/OrderContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { motion } from 'framer-motion';
@@ -10,8 +9,7 @@ import { motion } from 'framer-motion';
 const formatCurrency = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value || 0);
 
 export default function CartPage() {
-  const { cartItems, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
-  const { placeOrder } = useOrder();
+  const { cartItems, removeFromCart, updateQuantity, cartTotal } = useCart();
   const navigate = useNavigate();
 
   const shipping = cartTotal > 0 ? 15.00 : 0;
@@ -19,9 +17,7 @@ export default function CartPage() {
   const finalTotal = cartTotal + shipping + tax;
 
   const handleCheckout = () => {
-    placeOrder(cartItems, finalTotal);
-    clearCart();
-    navigate('/orders');
+    navigate('/checkout');
   };
 
   if (cartItems.length === 0) {
