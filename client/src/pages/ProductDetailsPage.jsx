@@ -5,6 +5,8 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
+import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
 
 const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
@@ -14,6 +16,8 @@ export default function ProductDetailsPage() {
   const navigate = useNavigate();
   const { currentProduct, fetchSingleProduct, products, loading } = useProducts();
   const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useWishlist();
+  const { user } = useAuth();
   
   const [activeImage, setActiveImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
@@ -40,12 +44,28 @@ export default function ProductDetailsPage() {
   const relatedProducts = products?.filter(p => p.category === currentProduct.category && p._id !== currentProduct._id).slice(0, 4) || [];
 
   const handleAddToCart = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     addToCart(currentProduct, quantity);
   };
 
   const handleBuyNow = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     addToCart(currentProduct, quantity);
     navigate('/cart');
+  };
+
+  const handleWishlist = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    toggleWishlist(currentProduct);
   };
 
   return (
@@ -164,9 +184,14 @@ export default function ProductDetailsPage() {
               <Button 
                 size="lg" 
                 variant="outline"
-                className="h-14 w-14 rounded-full p-0 border-border/50 bg-background/50 backdrop-blur"
+                onClick={handleWishlist}
+                className={`h-14 w-14 rounded-full p-0 backdrop-blur transition-all ${
+                  isInWishlist(currentProduct._id) 
+                    ? 'border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500/20' 
+                    : 'border-border/50 bg-background/50 text-muted-foreground hover:text-red-500'
+                }`}
               >
-                <Heart className="h-5 w-5 text-muted-foreground hover:text-red-500 transition-colors" />
+                <Heart className={`h-5 w-5 ${isInWishlist(currentProduct._id) ? 'fill-current' : ''}`} />
               </Button>
             </div>
           </div>

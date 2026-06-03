@@ -8,6 +8,7 @@ import { AuthProvider } from './context/AuthContext'
 import { ProductProvider } from './context/ProductContext'
 import { CartProvider } from './context/CartContext'
 import { OrderProvider } from './context/OrderContext'
+import { WishlistProvider } from './context/WishlistContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -15,8 +16,9 @@ createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <ProductProvider>
           <CartProvider>
-            <OrderProvider>
-              <App />
+            <WishlistProvider>
+              <OrderProvider>
+                <App />
               <Toaster position="bottom-right" toastOptions={{ 
                 duration: 3000,
                 style: {
@@ -25,7 +27,8 @@ createRoot(document.getElementById('root')).render(
                   border: '1px solid #27272A'
                 }
               }} />
-            </OrderProvider>
+              </OrderProvider>
+            </WishlistProvider>
           </CartProvider>
         </ProductProvider>
       </AuthProvider>

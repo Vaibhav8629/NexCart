@@ -2,15 +2,34 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, User, Search, Heart, Menu, LogOut, Settings, Package, X } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 
 export default function Navbar() {
   const { cartCount } = useCart();
+  const { wishlistCount } = useWishlist();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    if (value.trim() === '') {
+      navigate('/products');
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      setIsMenuOpen(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -35,19 +54,26 @@ export default function Navbar() {
         </div>
 
         <div className="hidden md:flex flex-1 items-center justify-center px-8">
-          <div className="relative w-full max-w-md">
+          <form onSubmit={handleSearch} className="relative w-full max-w-md">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
               type="search"
               placeholder="Search products..."
+              value={searchQuery}
+              onChange={handleSearchChange}
               className="w-full rounded-full border border-border bg-muted/50 px-9 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-foreground"
             />
-          </div>
+          </form>
         </div>
 
         <div className="flex items-center gap-4">
-          <Link to="/wishlist" className="hidden sm:flex text-muted-foreground hover:text-primary transition-colors">
+          <Link to="/wishlist" className="relative hidden sm:flex text-muted-foreground hover:text-primary transition-colors">
             <Heart className="h-5 w-5" />
+            {wishlistCount > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {wishlistCount}
+              </span>
+            )}
           </Link>
           <Link to="/cart" className="relative text-muted-foreground hover:text-primary transition-colors">
             <ShoppingCart className="h-5 w-5" />
@@ -111,14 +137,16 @@ export default function Navbar() {
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="md:hidden border-t border-border bg-background p-4 space-y-4">
-          <div className="relative">
+          <form onSubmit={handleSearch} className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
               type="search"
               placeholder="Search products..."
+              value={searchQuery}
+              onChange={handleSearchChange}
               className="w-full rounded-md border border-border bg-muted/50 px-9 py-2 text-sm outline-none focus:border-primary text-foreground"
             />
-          </div>
+          </form>
           <div className="flex flex-col space-y-3">
             <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-primary">Home</Link>
             <Link to="/products" className="text-sm font-medium text-muted-foreground hover:text-primary">Categories</Link>

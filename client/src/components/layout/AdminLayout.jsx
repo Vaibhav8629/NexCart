@@ -1,5 +1,6 @@
+import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Menu } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAuth } from '../../context/AuthContext';
 
@@ -13,6 +14,7 @@ const navItems = [
 export default function AdminLayout() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -20,24 +22,31 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="page-shell">
-      <div className="dashboard-grid">
-        <aside className="glass-card rounded-3xl p-5 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
+    <div className="min-h-screen bg-background p-4 lg:p-6">
+      <div className="flex flex-col lg:flex-row gap-6 items-start max-w-screen-2xl mx-auto">
+        <aside className={`glass-card rounded-3xl p-5 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] transition-all duration-300 ${isCollapsed ? 'lg:w-24' : 'lg:w-64'}`}>
           <div className="mb-8 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-sky-300">NexCart</p>
-              <h2 className="mt-1 text-2xl font-semibold text-white">Admin Panel</h2>
-            </div>
+            {!isCollapsed && (
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-sky-300">NexCart</p>
+                <h2 className="mt-1 text-2xl font-semibold text-white">Admin Panel</h2>
+              </div>
+            )}
+            <Button variant="outline" className="hidden lg:flex p-2 h-auto" onClick={() => setIsCollapsed(!isCollapsed)}>
+              {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
             <Button variant="outline" className="lg:hidden">
               <Menu className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Signed in as</p>
-            <p className="mt-1 font-medium text-white">{user?.name || 'Admin'}</p>
-            <p className="text-sm text-slate-400">{user?.email}</p>
-          </div>
+          {!isCollapsed && (
+            <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Signed in as</p>
+              <p className="mt-1 font-medium text-white">{user?.name || 'Admin'}</p>
+              <p className="text-sm text-slate-400">{user?.email}</p>
+            </div>
+          )}
 
           <nav className="space-y-2">
             {navItems.map((item) => {
@@ -49,23 +58,29 @@ export default function AdminLayout() {
                   to={item.to}
                   end={item.end}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${isActive ? 'bg-sky-400 text-slate-950' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`
+                    `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${isActive ? 'bg-sky-400 text-slate-950' : 'text-slate-300 hover:bg-white/5 hover:text-white'} ${isCollapsed ? 'justify-center' : ''}`
                   }
+                  title={isCollapsed ? item.label : undefined}
                 >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {!isCollapsed && <span>{item.label}</span>}
                 </NavLink>
               );
             })}
           </nav>
 
-          <Button variant="outline" className="mt-8 w-full justify-start" onClick={handleLogout}>
+          <Button 
+            variant="outline" 
+            className={`mt-8 ${isCollapsed ? 'w-auto justify-center px-4' : 'w-full justify-start'}`} 
+            onClick={handleLogout}
+            title={isCollapsed ? 'Logout' : undefined}
+          >
             <LogOut className="h-4 w-4" />
-            Logout
+            {!isCollapsed && <span className="ml-2">Logout</span>}
           </Button>
         </aside>
 
-        <main className="min-w-0">
+        <main className="flex-1 w-full min-w-0">
           <Outlet />
         </main>
       </div>

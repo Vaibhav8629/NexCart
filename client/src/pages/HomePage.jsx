@@ -67,7 +67,7 @@ export default function HomePage() {
                 <Truck className="h-6 w-6 text-primary" />
               </div>
               <h3 className="font-bold text-foreground text-lg mb-2">Free Global Shipping</h3>
-              <p className="text-muted-foreground text-sm">On all orders over $150.00</p>
+              <p className="text-muted-foreground text-sm">On all orders over ₹150.00</p>
             </div>
             <div className="flex flex-col items-center p-4">
               <div className="p-3 bg-primary/10 rounded-full mb-4">

@@ -10,11 +10,13 @@ export default function ProductListingPage() {
   const { products, loading } = useProducts();
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryQuery = searchParams.get('category');
+  const searchQuery = searchParams.get('search');
   
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [sortBy, setSortBy] = useState('popular');
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(categoryQuery || 'All');
+  const [selectedPriceRanges, setSelectedPriceRanges] = useState([]);
 
   const categories = ['All', 'Electronics', 'Fashion', 'Home', 'Sports', 'Accessories'];
 
@@ -22,8 +24,26 @@ export default function ProductListingPage() {
     if (products) {
       let result = [...products];
       
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        result = result.filter(p => p.name.toLowerCase().includes(query) || p.description?.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
+      }
+      
       if (selectedCategory !== 'All') {
         result = result.filter(p => p.category.toLowerCase() === selectedCategory.toLowerCase());
+      }
+      
+      if (selectedPriceRanges.length > 0) {
+        result = result.filter(p => {
+          const price = p.discountPrice || p.price;
+          return selectedPriceRanges.some(range => {
+            if (range === 'under50') return price < 50;
+            if (range === '50to100') return price >= 50 && price <= 100;
+            if (range === '100to500') return price > 100 && price <= 500;
+            if (range === 'over500') return price > 500;
+            return false;
+          });
+        });
       }
       
       switch(sortBy) {
@@ -36,13 +56,19 @@ export default function ProductListingPage() {
         case 'newest':
           result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           break;
-        default: // popular (just relying on default order or you could add a rating sort)
+        default:
           break;
       }
       
       setFilteredProducts(result);
     }
-  }, [products, selectedCategory, sortBy]);
+  }, [products, selectedCategory, sortBy, searchQuery, selectedPriceRanges]);
+
+  const handlePriceRangeToggle = (range) => {
+    setSelectedPriceRanges(prev => 
+      prev.includes(range) ? prev.filter(r => r !== range) : [...prev, range]
+    );
+  };
 
   const handleCategorySelect = (cat) => {
     setSelectedCategory(cat);
@@ -94,20 +120,20 @@ export default function ProductListingPage() {
             <h3 className="text-lg font-semibold text-foreground mb-4">Price Range</h3>
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <input type="checkbox" className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
-                <span className="text-muted-foreground text-sm">Under $50</span>
+                <input type="checkbox" checked={selectedPriceRanges.includes('under50')} onChange={() => handlePriceRangeToggle('under50')} className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
+                <span className="text-muted-foreground text-sm">Under ₹50</span>
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
-                <span className="text-muted-foreground text-sm">$50 to $100</span>
+                <input type="checkbox" checked={selectedPriceRanges.includes('50to100')} onChange={() => handlePriceRangeToggle('50to100')} className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
+                <span className="text-muted-foreground text-sm">₹50 to ₹100</span>
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
-                <span className="text-muted-foreground text-sm">$100 to $500</span>
+                <input type="checkbox" checked={selectedPriceRanges.includes('100to500')} onChange={() => handlePriceRangeToggle('100to500')} className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
+                <span className="text-muted-foreground text-sm">₹100 to ₹500</span>
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
-                <span className="text-muted-foreground text-sm">Over $500</span>
+                <input type="checkbox" checked={selectedPriceRanges.includes('over500')} onChange={() => handlePriceRangeToggle('over500')} className="rounded border-border bg-transparent text-primary focus:ring-primary h-4 w-4" />
+                <span className="text-muted-foreground text-sm">Over ₹500</span>
               </div>
             </div>
           </div>
@@ -118,7 +144,7 @@ export default function ProductListingPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {selectedCategory === 'All' ? 'All Products' : selectedCategory}
+                {searchQuery ? `Search results for "${searchQuery}"` : (selectedCategory === 'All' ? 'All Products' : selectedCategory)}
               </h1>
               <p className="text-muted-foreground mt-1">Showing {filteredProducts.length} results</p>
             </div>

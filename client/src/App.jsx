@@ -6,6 +6,7 @@ import ProductDetailsPage from './pages/ProductDetailsPage';
 import CartPage from './pages/CartPage';
 import OrdersPage from './pages/OrdersPage';
 import ProfilePage from './pages/ProfilePage';
+import WishlistPage from './pages/WishlistPage';
 
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
@@ -28,6 +29,7 @@ export default function App() {
 				<Route path="/cart" element={<CartPage />} />
 				<Route path="/orders" element={<OrdersPage />} />
 				<Route path="/profile" element={<ProfilePage />} />
+				<Route path="/wishlist" element={<WishlistPage />} />
 			</Route>
 
 			{/* Auth Routes (No Layout) */}

@@ -5,18 +5,26 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
+import { useAuth } from '../context/AuthContext';
 
-const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
+const formatCurrency = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value || 0);
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useWishlist();
+  const { user } = useAuth();
   const image = product.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80';
   const isLowStock = Number(product.stock) <= 5;
   const isOutOfStock = Number(product.stock) <= 0;
 
   const handleAddToCart = (e) => {
     e.stopPropagation();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     if (!isOutOfStock) {
       addToCart(product);
     }
@@ -24,7 +32,11 @@ export default function ProductCard({ product }) {
 
   const handleWishlist = (e) => {
     e.stopPropagation();
-    // Wishlist context not implemented yet, just visual for now
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    toggleWishlist(product);
   };
 
   return (
@@ -52,9 +64,13 @@ export default function ProductCard({ product }) {
           
           <button 
             onClick={handleWishlist}
-            className="absolute right-4 top-4 rounded-full bg-background/80 p-2 text-muted-foreground backdrop-blur-md hover:text-red-500 hover:bg-background transition-all"
+            className={`absolute right-4 top-4 rounded-full p-2 backdrop-blur-md transition-all ${
+              isInWishlist(product._id) 
+                ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' 
+                : 'bg-background/80 text-muted-foreground hover:text-red-500 hover:bg-background'
+            }`}
           >
-            <Heart className="h-5 w-5" />
+            <Heart className={`h-5 w-5 ${isInWishlist(product._id) ? 'fill-current' : ''}`} />
           </button>
         </div>
         <CardContent className="space-y-3 p-5">
