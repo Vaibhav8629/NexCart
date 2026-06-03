@@ -53,14 +53,32 @@ const orderSchema = new mongoose.Schema(
     shippingCost: { type: Number, required: true, min: 0 },
     tax: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
+    // ── Payment fields ──────────────────────────────────────
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed'],
-      default: 'paid',
+      enum: ['pending', 'paid', 'failed', 'refunded'],
+      default: 'pending',
     },
+    paymentMethod: {
+      type: String,
+      default: 'stripe',
+    },
+    paymentIntentId: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    amountPaid: {
+      type: Number,
+      default: 0,
+    },
+    transactionDate: {
+      type: Date,
+    },
+    // ── Order status ─────────────────────────────────────────
     status: {
       type: String,
-      enum: ['pending', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'],
+      enum: ['pending', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'payment_failed'],
       default: 'pending',
       index: true,
     },

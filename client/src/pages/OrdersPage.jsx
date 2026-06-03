@@ -23,6 +23,7 @@ const STATUS_CONFIG = {
   out_for_delivery: { label: 'Out for Delivery',  color: 'bg-violet-500/15 text-violet-400 border-violet-500/30', icon: Truck },
   delivered:        { label: 'Delivered',         color: 'bg-green-500/15 text-green-400 border-green-500/30',  icon: CheckCircle2 },
   cancelled:        { label: 'Cancelled',         color: 'bg-red-500/15 text-red-400 border-red-500/30',        icon: X },
+  payment_failed:   { label: 'Payment Failed',    color: 'bg-red-500/15 text-red-400 border-red-500/30',        icon: X },
 };
 
 function StatusBadge({ status }) {

@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Package, MapPin, CreditCard, Clock, CheckCircle2,
-  Truck, X, Loader2, User, Phone, Mail,
+  Truck, X, Loader2, User, Phone, Mail, Download,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOrder } from '../context/OrderContext';
 import { useAuth } from '../context/AuthContext';
+import { generateInvoice } from '../lib/invoiceGenerator';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 
@@ -37,6 +38,7 @@ const STATUS_CONFIG = {
   out_for_delivery: { label: 'Out for Delivery',  color: 'text-violet-400' },
   delivered:        { label: 'Delivered',         color: 'text-green-400' },
   cancelled:        { label: 'Cancelled',         color: 'text-red-400' },
+  payment_failed:   { label: 'Payment Failed',    color: 'text-red-400' },
 };
 
 function SkeletonCard() {
@@ -106,10 +108,11 @@ export default function OrderDetailsPage() {
   }
 
   const isCancelled = order.status === 'cancelled';
+  const isPaymentFailed = order.status === 'payment_failed';
   const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
 
   // Timeline: find active step index
-  const activeStepIdx = isCancelled ? -1 :
+  const activeStepIdx = (isCancelled || isPaymentFailed) ? -1 :
     TIMELINE_STEPS.map((s) => s.key).lastIndexOf(order.status);
 
   return (
@@ -128,6 +131,15 @@ export default function OrderDetailsPage() {
           <p className="text-muted-foreground text-sm mt-1 font-mono">#{order._id}</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg border-primary/30 text-primary hover:bg-primary/10"
+            onClick={() => generateInvoice(order)}
+          >
+            <Download className="mr-2 h-3.5 w-3.5" />
+            Download Invoice
+          </Button>
           <span className={`text-base font-semibold ${statusCfg.color}`}>
             {statusCfg.label}
           </span>
@@ -172,6 +184,21 @@ export default function OrderDetailsPage() {
                           {formatDateTime(order.timeline.find((t) => t.status === 'cancelled').timestamp)}
                         </p>
                       )}
+                    </div>
+                  </div>
+                ) : isPaymentFailed ? (
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                    <X className="h-5 w-5 text-red-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-400">Payment Failed</p>
+                      {order.timeline?.find((t) => t.status === 'payment_failed') && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {formatDateTime(order.timeline.find((t) => t.status === 'payment_failed').timestamp)}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {order.timeline?.find((t) => t.status === 'payment_failed')?.note}
+                      </p>
                     </div>
                   </div>
                 ) : (
@@ -279,8 +306,14 @@ export default function OrderDetailsPage() {
                   </div>
                   <div className="pt-1 flex justify-between text-xs text-muted-foreground">
                     <span>Payment</span>
-                    <span className={order.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-400'}>
-                      {order.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
+                    <span className={
+                      order.paymentStatus === 'paid' ? 'text-green-400' :
+                      order.paymentStatus === 'failed' ? 'text-red-400' :
+                      'text-amber-400'
+                    }>
+                      {order.paymentStatus === 'paid' ? 'Paid' :
+                       order.paymentStatus === 'failed' ? 'Failed' :
+                       'Pending'}
                     </span>
                   </div>
                 </div>

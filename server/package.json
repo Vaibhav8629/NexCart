@@ -1,7 +1,7 @@
 {
   "name": "nexcart-server",
   "version": "1.0.0",
-  "description": "NexCart backend authentication API",
+  "description": "NexCart backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -18,7 +18,8 @@
     "express": "^4.19.2",
     "express-async-handler": "^1.2.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.7.0"
+    "mongoose": "^8.7.0",
+    "stripe": "^22.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

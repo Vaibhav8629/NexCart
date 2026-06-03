@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowLeft, MapPin, User, Phone, Mail, CreditCard, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCart } from '../context/CartContext';
-import { useOrder } from '../context/OrderContext';
 import { useAuth } from '../context/AuthContext';
+import { createPaymentIntentRequest } from '../lib/paymentApi';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
+import toast from 'react-hot-toast';
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value || 0);
@@ -24,15 +25,14 @@ const INITIAL_FORM = {
 };
 
 const FIELD_CONFIG = [
-  { name: 'fullName', label: 'Full Name', placeholder: 'John Doe', icon: User, type: 'text', required: true },
-  { name: 'email', label: 'Email Address', placeholder: 'john@example.com', icon: Mail, type: 'email', required: true },
-  { name: 'phone', label: 'Phone Number', placeholder: '+91 98765 43210', icon: Phone, type: 'tel', required: true },
-  { name: 'addressLine', label: 'Address Line', placeholder: '123, Luxury Apartments, Park Street', icon: MapPin, type: 'text', required: true },
+  { name: 'fullName',    label: 'Full Name',       placeholder: 'John Doe',               icon: User,   type: 'text'  },
+  { name: 'email',       label: 'Email Address',   placeholder: 'john@example.com',        icon: Mail,   type: 'email' },
+  { name: 'phone',       label: 'Phone Number',    placeholder: '+91 98765 43210',          icon: Phone,  type: 'tel'   },
+  { name: 'addressLine', label: 'Address Line',    placeholder: '123, Park Street',         icon: MapPin, type: 'text'  },
 ];
 
 export default function CheckoutPage() {
-  const { cartItems, cartTotal, clearCart } = useCart();
-  const { placeOrder, loading } = useOrder();
+  const { cartItems, cartTotal } = useCart();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -42,9 +42,10 @@ export default function CheckoutPage() {
     email: user?.email || '',
   });
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   const shipping = cartTotal > 0 ? 15 : 0;
-  const tax = cartTotal * 0.08;
+  const tax = parseFloat((cartTotal * 0.08).toFixed(2));
   const total = cartTotal + shipping + tax;
 
   const handleChange = (e) => {
@@ -68,20 +69,14 @@ export default function CheckoutPage() {
     return Object.keys(next).length === 0;
   };
 
-  const handlePlaceOrder = async () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
+  const handleProceedToPayment = async () => {
+    if (!isAuthenticated) { navigate('/login'); return; }
     if (cartItems.length === 0) return;
     if (!validate()) return;
 
-    const payload = {
-      items: cartItems.map((item) => ({
-        productId: item._id,
-        quantity: item.quantity,
-      })),
-      shippingAddress: {
+    setLoading(true);
+    try {
+      const shippingAddress = {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
@@ -90,19 +85,30 @@ export default function CheckoutPage() {
         state: form.state.trim(),
         pincode: form.pincode.trim(),
         country: form.country.trim(),
-      },
-      subtotal: cartTotal,
-      shippingCost: shipping,
-      tax,
-      totalAmount: total,
-    };
+      };
 
-    try {
-      const order = await placeOrder(payload);
-      clearCart();
-      navigate('/order-success', { state: { order } });
-    } catch {
-      // error already toasted in context
+      const payload = {
+        items: cartItems.map((item) => ({ productId: item._id, quantity: item.quantity })),
+        shippingAddress,
+        shippingCost: shipping,
+      };
+
+      const result = await createPaymentIntentRequest(payload);
+
+      // Navigate to payment page with all needed state
+      navigate('/payment', {
+        state: {
+          clientSecret: result.clientSecret,
+          paymentIntentId: result.paymentIntentId,
+          orderId: result.orderId,
+          breakdown: result.breakdown,
+          shippingAddress,
+        },
+      });
+    } catch (err) {
+      toast.error(err.message || 'Failed to initialise payment.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -125,48 +131,53 @@ export default function CheckoutPage() {
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-screen-xl">
-      {/* Header */}
       <div className="mb-8 flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-primary">
-          <Link to="/cart">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Cart
-          </Link>
+          <Link to="/cart"><ArrowLeft className="h-4 w-4 mr-2" />Back to Cart</Link>
         </Button>
+      </div>
+
+      {/* Step indicator */}
+      <div className="flex items-center gap-2 mb-8">
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-black text-xs font-bold">1</div>
+          <span className="text-sm font-semibold text-primary">Shipping</span>
+        </div>
+        <div className="flex-1 h-px bg-border/40 mx-2" />
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-full border border-border/40 flex items-center justify-center text-muted-foreground text-xs font-bold">2</div>
+          <span className="text-sm text-muted-foreground">Payment</span>
+        </div>
+        <div className="flex-1 h-px bg-border/40 mx-2" />
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-full border border-border/40 flex items-center justify-center text-muted-foreground text-xs font-bold">3</div>
+          <span className="text-sm text-muted-foreground">Confirmation</span>
+        </div>
       </div>
 
       <h1 className="text-4xl font-bold mb-10 text-foreground">Checkout</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
-        {/* ── LEFT: Customer Information ── */}
+        {/* ── LEFT ── */}
         <div className="lg:col-span-3 space-y-6">
+          {/* Customer Info */}
           <Card className="bg-card/80 backdrop-blur border-border/50">
             <CardContent className="p-6 md:p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-xl bg-primary/10">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
+                <div className="p-2 rounded-xl bg-primary/10"><User className="h-5 w-5 text-primary" /></div>
                 <h2 className="text-xl font-semibold text-foreground">Customer Information</h2>
               </div>
-
               <div className="grid gap-4">
                 {FIELD_CONFIG.map(({ name, label, placeholder, icon: Icon, type }) => (
                   <div key={name} className="grid gap-1.5">
                     <label className="text-sm font-medium text-muted-foreground">{label}</label>
                     <div className="relative">
                       <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        name={name}
-                        type={type}
-                        value={form[name]}
-                        onChange={handleChange}
+                      <Input name={name} type={type} value={form[name]} onChange={handleChange}
                         placeholder={placeholder}
-                        className="pl-10 bg-background/50 border-border/50 focus:border-primary text-foreground"
-                      />
+                        className="pl-10 bg-background/50 border-border/50 focus:border-primary text-foreground" />
                     </div>
-                    {errors[name] && (
-                      <p className="text-xs text-red-400">{errors[name]}</p>
-                    )}
+                    {errors[name] && <p className="text-xs text-red-400">{errors[name]}</p>}
                   </div>
                 ))}
               </div>
@@ -177,53 +188,23 @@ export default function CheckoutPage() {
           <Card className="bg-card/80 backdrop-blur border-border/50">
             <CardContent className="p-6 md:p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-xl bg-primary/10">
-                  <MapPin className="h-5 w-5 text-primary" />
-                </div>
+                <div className="p-2 rounded-xl bg-primary/10"><MapPin className="h-5 w-5 text-primary" /></div>
                 <h2 className="text-xl font-semibold text-foreground">Shipping Address</h2>
               </div>
-
-              <div className="grid gap-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
-                    { name: 'city', label: 'City', placeholder: 'Mumbai' },
-                    { name: 'state', label: 'State', placeholder: 'Maharashtra' },
-                    { name: 'pincode', label: 'Pincode', placeholder: '400001' },
-                    { name: 'country', label: 'Country', placeholder: 'India' },
-                  ].map(({ name, label, placeholder }) => (
-                    <div key={name} className="grid gap-1.5">
-                      <label className="text-sm font-medium text-muted-foreground">{label}</label>
-                      <Input
-                        name={name}
-                        value={form[name]}
-                        onChange={handleChange}
-                        placeholder={placeholder}
-                        className="bg-background/50 border-border/50 focus:border-primary text-foreground"
-                      />
-                      {errors[name] && (
-                        <p className="text-xs text-red-400">{errors[name]}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Payment Info */}
-          <Card className="bg-card/80 backdrop-blur border-border/50">
-            <CardContent className="p-6 md:p-8">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-xl bg-primary/10">
-                  <CreditCard className="h-5 w-5 text-primary" />
-                </div>
-                <h2 className="text-xl font-semibold text-foreground">Payment Method</h2>
-              </div>
-              <div className="flex items-center gap-3 p-4 rounded-xl border border-primary/30 bg-primary/5">
-                <div className="h-4 w-4 rounded-full border-2 border-primary flex items-center justify-center">
-                  <div className="h-2 w-2 rounded-full bg-primary" />
-                </div>
-                <span className="text-sm font-medium text-foreground">Cash on Delivery</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { name: 'city',    label: 'City',    placeholder: 'Mumbai' },
+                  { name: 'state',   label: 'State',   placeholder: 'Maharashtra' },
+                  { name: 'pincode', label: 'Pincode', placeholder: '400001' },
+                  { name: 'country', label: 'Country', placeholder: 'India' },
+                ].map(({ name, label, placeholder }) => (
+                  <div key={name} className="grid gap-1.5">
+                    <label className="text-sm font-medium text-muted-foreground">{label}</label>
+                    <Input name={name} value={form[name]} onChange={handleChange} placeholder={placeholder}
+                      className="bg-background/50 border-border/50 focus:border-primary text-foreground" />
+                    {errors[name] && <p className="text-xs text-red-400">{errors[name]}</p>}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -235,21 +216,13 @@ export default function CheckoutPage() {
             <CardContent className="p-6 md:p-8">
               <h2 className="text-2xl font-bold mb-6 text-foreground">Order Summary</h2>
 
-              {/* Items */}
-              <div className="space-y-4 mb-6 max-h-72 overflow-y-auto pr-1">
+              <div className="space-y-4 mb-6 max-h-64 overflow-y-auto pr-1">
                 {cartItems.map((item) => (
-                  <motion.div
-                    key={item._id}
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center gap-3"
-                  >
+                  <motion.div key={item._id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-3">
                     <div className="relative flex-shrink-0">
-                      <img
-                        src={item.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=200&q=80'}
-                        alt={item.name}
-                        className="w-14 h-14 object-cover rounded-lg border border-border/30"
-                      />
+                      <img src={item.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=200&q=80'}
+                        alt={item.name} className="w-14 h-14 object-cover rounded-lg border border-border/30" />
                       <span className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
                         {item.quantity}
                       </span>
@@ -265,7 +238,6 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Totals */}
               <div className="border-t border-border/50 pt-4 space-y-3 text-sm">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Subtotal ({cartItems.length} items)</span>
@@ -288,22 +260,13 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <Button
-                size="lg"
-                className="w-full text-base font-bold rounded-xl py-6 bg-primary hover:bg-[#FFB833] text-black shadow-lg hover:shadow-primary/25 transition-all"
-                onClick={handlePlaceOrder}
-                disabled={loading}
-              >
+              <Button size="lg"
+                className="w-full text-base font-bold rounded-xl py-6 bg-primary hover:bg-[#FFB833] text-black shadow-lg transition-all"
+                onClick={handleProceedToPayment} disabled={loading}>
                 {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Placing Order...
-                  </>
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Preparing Payment...</>
                 ) : (
-                  <>
-                    <CreditCard className="mr-2 h-5 w-5" />
-                    Place Order
-                  </>
+                  <><CreditCard className="mr-2 h-5 w-5" />Proceed to Payment</>
                 )}
               </Button>
 
@@ -311,6 +274,11 @@ export default function CheckoutPage() {
                 <Link to="/products" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   Continue Shopping
                 </Link>
+              </div>
+
+              <div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-muted-foreground"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+                Secured by Stripe. Your payment info is encrypted.
               </div>
             </CardContent>
           </Card>
