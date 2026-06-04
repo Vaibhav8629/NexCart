@@ -46,3 +46,12 @@ export const deleteProductRequest = async (productId) => {
     throw new Error(parseApiError(error), { cause: error });
   }
 };
+
+export const fetchInventoryStatsRequest = async () => {
+  try {
+    const { data } = await apiClient.get('/products/admin/inventory-stats');
+    return data.stats;
+  } catch (error) {
+    throw new Error(parseApiError(error), { cause: error });
+  }
+};

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Menu, ChevronLeft, ChevronRight, MessageSquare, Ticket } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
   { label: 'Dashboard', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Products', to: '/admin/products', icon: Package },
+  { label: 'Coupons', to: '/admin/coupons', icon: Ticket },
   { label: 'Orders', to: '/admin/orders', icon: ShoppingBag },
   { label: 'Users', to: '/admin/users', icon: Users },
+  { label: 'Reviews', to: '/admin/reviews', icon: MessageSquare },
 ];
 
 export default function AdminLayout() {

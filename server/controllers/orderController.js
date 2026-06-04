@@ -1,10 +1,50 @@
 const asyncHandler = require('express-async-handler');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const {
+  roundCurrency,
+  resolveCouponQuote,
+  buildCouponSnapshot,
+  recordCouponUsage,
+} = require('../utils/couponUtils');
+
+async function buildOrderItems(items) {
+  let subtotal = 0;
+  const enrichedItems = [];
+
+  for (const item of items) {
+    const product = await Product.findById(item.productId || item._id);
+    if (!product) {
+      return { error: `Product not found: ${item.productId || item._id}` };
+    }
+
+    const qty = Number(item.quantity) || 1;
+    if (product.stock < qty) {
+      return {
+        error: `Insufficient stock for "${product.name}". Available: ${product.stock}, requested: ${qty}.`,
+      };
+    }
+
+    const price = product.discountPrice > 0 ? product.discountPrice : product.price;
+    subtotal += price * qty;
+    enrichedItems.push({
+      product: product._id,
+      name: product.name,
+      image: product.images?.[0] || '',
+      price,
+      quantity: qty,
+    });
+  }
+
+  return {
+    enrichedItems,
+    subtotal: roundCurrency(subtotal),
+  };
+}
 
 // ─── User: Place Order ────────────────────────────────────────────────────────
 const placeOrder = asyncHandler(async (req, res) => {
-  const { items, shippingAddress, subtotal, shippingCost, tax, totalAmount } = req.body;
+  const { items, shippingAddress, shippingCost, couponCode } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, message: 'Order must contain at least one item.' });
@@ -21,31 +61,45 @@ const placeOrder = asyncHandler(async (req, res) => {
     }
   }
 
-  // Validate & enrich items from DB
-  const enrichedItems = [];
-  for (const item of items) {
-    const product = await Product.findById(item.productId || item._id);
-    if (!product) {
-      return res.status(404).json({ success: false, message: `Product not found: ${item.productId || item._id}` });
-    }
-    enrichedItems.push({
-      product: product._id,
-      name: product.name,
-      image: product.images?.[0] || '',
-      price: product.discountPrice > 0 ? product.discountPrice : product.price,
-      quantity: Number(item.quantity) || 1,
-    });
+  const pricedItems = await buildOrderItems(items);
+  if (pricedItems.error) {
+    const statusCode = pricedItems.error.startsWith('Product not found') ? 404 : 400;
+    return res.status(statusCode).json({ success: false, message: pricedItems.error });
   }
+
+  const { enrichedItems, subtotal } = pricedItems;
+  const shipping = Number(shippingCost) || (subtotal > 0 ? 15 : 0);
+  const tax = roundCurrency(subtotal * 0.08);
+
+  let coupon = null;
+  let discountAmount = 0;
+
+  if (couponCode) {
+    try {
+      const quote = await resolveCouponQuote({ code: couponCode, subtotal });
+      coupon = buildCouponSnapshot(quote.coupon, quote.discountAmount);
+      discountAmount = quote.discountAmount;
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message || 'Invalid Coupon' });
+    }
+  }
+
+  const totalAmount = roundCurrency(Math.max(subtotal - discountAmount, 0) + shipping + tax);
 
   const order = await Order.create({
     user: req.user.id,
     items: enrichedItems,
     shippingAddress,
-    subtotal: Number(subtotal) || 0,
-    shippingCost: Number(shippingCost) || 0,
-    tax: Number(tax) || 0,
-    totalAmount: Number(totalAmount) || 0,
+    subtotal,
+    shippingCost: shipping,
+    tax,
+    totalAmount,
+    coupon,
   });
+
+  if (coupon) {
+    await recordCouponUsage(order).catch(() => {});
+  }
 
   return res.status(201).json({
     success: true,

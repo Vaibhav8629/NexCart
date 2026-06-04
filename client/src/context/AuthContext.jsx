@@ -69,6 +69,12 @@ export function AuthProvider({ children }) {
     localStorage.setItem('nexcart_user', JSON.stringify(nextUser));
   }, []);
 
+  // Updates user data in state + localStorage without changing the token
+  const updateUser = useCallback((updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('nexcart_user', JSON.stringify(updatedUser));
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('nexcart_token');
     localStorage.removeItem('nexcart_user');
@@ -84,9 +90,10 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(token),
       isAdmin: user?.role === 'admin',
       setSession,
+      updateUser,
       logout,
     }),
-    [loading, logout, setSession, token, user]
+    [loading, logout, setSession, updateUser, token, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

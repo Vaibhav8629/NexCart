@@ -29,16 +29,6 @@ export default function Footer() {
           </div>
           
           <div>
-            <h4 className="font-semibold mb-4 text-foreground">Shop</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/products" className="hover:text-primary transition-colors">All Products</Link></li>
-              <li><Link to="/products?category=Electronics" className="hover:text-primary transition-colors">Electronics</Link></li>
-              <li><Link to="/products?category=Fashion" className="hover:text-primary transition-colors">Fashion</Link></li>
-              <li><Link to="/products?category=Accessories" className="hover:text-primary transition-colors">Accessories</Link></li>
-            </ul>
-          </div>
-          
-          <div>
             <h4 className="font-semibold mb-4 text-foreground">Account</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link to="/profile" className="hover:text-primary transition-colors">My Profile</Link></li>
@@ -51,10 +41,10 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-foreground">Support</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-primary transition-colors">Contact Us</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">FAQs</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Shipping Policy</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Returns & Refunds</a></li>
+              <li><a className="hover:text-primary transition-colors">Contact Us</a></li>
+              <li><a className="hover:text-primary transition-colors">FAQs</a></li>
+              <li><a className="hover:text-primary transition-colors">Shipping Policy</a></li>
+              <li><a className="hover:text-primary transition-colors">Returns & Refunds</a></li>
             </ul>
           </div>
         </div>
@@ -62,8 +52,8 @@ export default function Footer() {
         <div className="mt-12 border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} NexCart. All rights reserved.</p>
           <div className="flex space-x-4 mt-4 md:mt-0">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
+            <a  className="hover:text-primary transition-colors">Privacy Policy</a>
+            <a  className="hover:text-primary transition-colors">Terms of Service</a>
           </div>
         </div>
       </div>

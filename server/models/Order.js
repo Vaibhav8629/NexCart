@@ -29,6 +29,22 @@ const shippingAddressSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const couponSnapshotSchema = new mongoose.Schema(
+  {
+    couponId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Coupon',
+    },
+    code: { type: String, trim: true },
+    discountType: { type: String, enum: ['percentage', 'fixed'] },
+    discountValue: { type: Number, min: 0 },
+    minimumOrderAmount: { type: Number, min: 0 },
+    expiryDate: { type: Date },
+    discountAmount: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     user: {
@@ -53,6 +69,14 @@ const orderSchema = new mongoose.Schema(
     shippingCost: { type: Number, required: true, min: 0 },
     tax: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
+    coupon: {
+      type: couponSnapshotSchema,
+      default: null,
+    },
+    couponUsageRecorded: {
+      type: Boolean,
+      default: false,
+    },
     // ── Payment fields ──────────────────────────────────────
     paymentStatus: {
       type: String,
@@ -83,6 +107,8 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
     estimatedDelivery: { type: Date },
+    // Prevents double stock deduction if both webhook and confirm endpoint fire
+    stockDeducted: { type: Boolean, default: false },
     timeline: [
       {
         status: { type: String, required: true },

@@ -5,6 +5,9 @@ const productController = require('../controllers/productController');
 
 const router = express.Router();
 
+// Admin: inventory stats (specific path BEFORE /:id)
+router.get('/admin/inventory-stats', authMiddleware, requireAdmin, productController.getInventoryStats);
+
 router.get('/', productController.getProducts);
 router.get('/:id', productController.getProductById);
 router.post('/', authMiddleware, requireAdmin, productController.createProduct);

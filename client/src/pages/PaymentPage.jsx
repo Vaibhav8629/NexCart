@@ -158,7 +158,7 @@ export default function PaymentPage() {
   const navigate = useNavigate();
   const { clearCart } = useCart();
 
-  const { clientSecret, paymentIntentId, orderId, breakdown, shippingAddress } =
+  const { clientSecret, paymentIntentId, orderId, breakdown, shippingAddress, coupon } =
     location.state || {};
 
   useEffect(() => {
@@ -270,6 +270,12 @@ export default function PaymentPage() {
                       <span>Subtotal</span>
                       <span className="text-foreground font-medium">{formatCurrency(breakdown.subtotal)}</span>
                     </div>
+                    {breakdown.couponDiscount > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Coupon {coupon?.code ? `(${coupon.code})` : ''}</span>
+                        <span className="text-emerald-400 font-medium">-{formatCurrency(breakdown.couponDiscount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-muted-foreground">
                       <span>Shipping</span>
                       <span className="text-foreground font-medium">{formatCurrency(breakdown.shipping)}</span>

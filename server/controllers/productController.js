@@ -128,10 +128,24 @@ const deleteProduct = asyncHandler(async (req, res) => {
   });
 });
 
+const getInventoryStats = asyncHandler(async (req, res) => {
+  const [total, outOfStock, lowStock] = await Promise.all([
+    Product.countDocuments(),
+    Product.countDocuments({ stock: 0 }),
+    Product.countDocuments({ stock: { $gt: 0, $lte: 5 } }),
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    stats: { total, outOfStock, lowStock, inStock: total - outOfStock - lowStock },
+  });
+});
+
 module.exports = {
   createProduct,
   getProducts,
   getProductById,
   updateProduct,
   deleteProduct,
+  getInventoryStats,
 };

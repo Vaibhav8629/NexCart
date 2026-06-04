@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { createPaymentIntentRequest } from '../lib/paymentApi';
+import { removeCouponRequest, validateCouponRequest } from '../lib/couponApi';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
@@ -32,7 +33,7 @@ const FIELD_CONFIG = [
 ];
 
 export default function CheckoutPage() {
-  const { cartItems, cartTotal } = useCart();
+  const { cartItems, cartTotal, validateCartStock } = useCart();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -43,10 +44,15 @@ export default function CheckoutPage() {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
 
   const shipping = cartTotal > 0 ? 15 : 0;
   const tax = parseFloat((cartTotal * 0.08).toFixed(2));
-  const total = cartTotal + shipping + tax;
+  const couponDiscount = appliedCoupon?.discountAmount || 0;
+  const total = Math.max(cartTotal - couponDiscount, 0) + shipping + tax;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -76,6 +82,14 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
+      // Validate live stock before hitting payment API
+      const { valid, errors: stockErrors } = await validateCartStock();
+      if (!valid) {
+        stockErrors.forEach((msg) => toast.error(msg, { duration: 5000 }));
+        setLoading(false);
+        return;
+      }
+
       const shippingAddress = {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
@@ -91,6 +105,7 @@ export default function CheckoutPage() {
         items: cartItems.map((item) => ({ productId: item._id, quantity: item.quantity })),
         shippingAddress,
         shippingCost: shipping,
+        couponCode: appliedCoupon?.code || '',
       };
 
       const result = await createPaymentIntentRequest(payload);
@@ -102,6 +117,7 @@ export default function CheckoutPage() {
           paymentIntentId: result.paymentIntentId,
           orderId: result.orderId,
           breakdown: result.breakdown,
+          coupon: result.coupon,
           shippingAddress,
         },
       });
@@ -110,6 +126,43 @@ export default function CheckoutPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApplyCoupon = async () => {
+    const normalizedCode = couponCode.trim();
+
+    if (!normalizedCode) {
+      setCouponError('Enter a coupon code.');
+      return;
+    }
+
+    setCouponLoading(true);
+    try {
+      const result = await validateCouponRequest({ code: normalizedCode, subtotal: cartTotal });
+      setAppliedCoupon(result.coupon);
+      setCouponCode(result.coupon?.code || normalizedCode);
+      setCouponError('');
+      toast.success('Coupon applied successfully.');
+    } catch (error) {
+      setAppliedCoupon(null);
+      setCouponError(error.message || 'Invalid Coupon');
+      toast.error(error.message || 'Invalid Coupon');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = async () => {
+    try {
+      await removeCouponRequest({ code: appliedCoupon?.code || couponCode.trim() });
+    } catch (error) {
+      // Removing a local coupon should still clear the UI state even if the acknowledgement fails.
+    }
+
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
+    toast.success('Coupon removed.');
   };
 
   if (cartItems.length === 0) {
@@ -243,6 +296,35 @@ export default function CheckoutPage() {
                   <span>Subtotal ({cartItems.length} items)</span>
                   <span className="text-foreground font-medium">{formatCurrency(cartTotal)}</span>
                 </div>
+                <div className="rounded-2xl border border-border/40 bg-background/40 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Enter Coupon Code</p>
+                    <p className="text-xs text-muted-foreground">Apply one valid coupon before payment.</p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="SAVE10"
+                      className="bg-background/50 border-border/50 focus:border-primary text-foreground uppercase"
+                    />
+                    {appliedCoupon ? (
+                      <Button type="button" variant="outline" onClick={handleRemoveCoupon} className="shrink-0">
+                        Remove Coupon
+                      </Button>
+                    ) : (
+                      <Button type="button" onClick={handleApplyCoupon} disabled={couponLoading} className="shrink-0">
+                        {couponLoading ? 'Applying...' : 'Apply Coupon'}
+                      </Button>
+                    )}
+                  </div>
+                  {couponError && <p className="text-xs text-red-400">{couponError}</p>}
+                  {appliedCoupon && (
+                    <p className="text-xs text-emerald-400">
+                      Applied {appliedCoupon.code}. You saved {formatCurrency(couponDiscount)}.
+                    </p>
+                  )}
+                </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Shipping</span>
                   <span className="text-foreground font-medium">{formatCurrency(shipping)}</span>
@@ -251,6 +333,12 @@ export default function CheckoutPage() {
                   <span>Tax (8%)</span>
                   <span className="text-foreground font-medium">{formatCurrency(tax)}</span>
                 </div>
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Coupon Discount</span>
+                    <span className="text-emerald-400 font-medium">-{formatCurrency(couponDiscount)}</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-border/50 mt-4 pt-4 mb-6">

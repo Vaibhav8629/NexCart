@@ -2,13 +2,63 @@ const asyncHandler = require('express-async-handler');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const {
+  roundCurrency,
+  resolveCouponQuote,
+  buildCouponSnapshot,
+  recordCouponUsage,
+} = require('../utils/couponUtils');
+
+async function buildOrderItems(items) {
+  let subtotal = 0;
+  const enrichedItems = [];
+
+  for (const item of items) {
+    const product = await Product.findById(item.productId);
+    if (!product) {
+      return { error: `Product not found: ${item.productId}` };
+    }
+
+    const qty = Number(item.quantity) || 1;
+    if (product.stock < qty) {
+      return { error: `Insufficient stock for: ${product.name}` };
+    }
+
+    const price = product.discountPrice > 0 ? product.discountPrice : product.price;
+    subtotal += price * qty;
+    enrichedItems.push({
+      product: product._id,
+      name: product.name,
+      image: product.images?.[0] || '',
+      price,
+      quantity: qty,
+    });
+  }
+
+  return {
+    enrichedItems,
+    subtotal: roundCurrency(subtotal),
+  };
+}
+
+// ─── Helper: deduct stock for a paid order (idempotent via stockDeducted flag) ─
+async function deductStock(order) {
+  if (order.stockDeducted) return; // already done
+  for (const item of order.items) {
+    await Product.findByIdAndUpdate(item.product, {
+      $inc: { stock: -item.quantity },
+    });
+  }
+  order.stockDeducted = true;
+  await order.save();
+}
 
 // ─── Create Payment Intent ────────────────────────────────────────────────────
 // Called from checkout. Validates cart server-side, creates Stripe PaymentIntent
 // and a pending Order in MongoDB. The order is fulfilled by the webhook or the
 // client-side confirm endpoint.
 const createPaymentIntent = asyncHandler(async (req, res) => {
-  const { items, shippingAddress, shippingCost } = req.body;
+  const { items, shippingAddress, shippingCost, couponCode } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, message: 'Cart is empty.' });
@@ -21,33 +71,30 @@ const createPaymentIntent = asyncHandler(async (req, res) => {
     }
   }
 
-  // Server-side price calculation — never trust client amounts
-  let subtotal = 0;
-  const enrichedItems = [];
-
-  for (const item of items) {
-    const product = await Product.findById(item.productId);
-    if (!product) {
-      return res.status(404).json({ success: false, message: `Product not found: ${item.productId}` });
-    }
-    if (product.stock < item.quantity) {
-      return res.status(400).json({ success: false, message: `Insufficient stock for: ${product.name}` });
-    }
-    const price = product.discountPrice > 0 ? product.discountPrice : product.price;
-    const qty = Number(item.quantity) || 1;
-    subtotal += price * qty;
-    enrichedItems.push({
-      product: product._id,
-      name: product.name,
-      image: product.images?.[0] || '',
-      price,
-      quantity: qty,
-    });
+  const pricedItems = await buildOrderItems(items);
+  if (pricedItems.error) {
+    const statusCode = pricedItems.error.startsWith('Product not found') ? 404 : 400;
+    return res.status(statusCode).json({ success: false, message: pricedItems.error });
   }
 
+  const { enrichedItems, subtotal } = pricedItems;
   const shipping = Number(shippingCost) || (subtotal > 0 ? 15 : 0);
-  const tax = parseFloat((subtotal * 0.08).toFixed(2));
-  const totalAmount = parseFloat((subtotal + shipping + tax).toFixed(2));
+  const tax = roundCurrency(subtotal * 0.08);
+
+  let coupon = null;
+  let discountAmount = 0;
+
+  if (couponCode) {
+    try {
+      const quote = await resolveCouponQuote({ code: couponCode, subtotal });
+      coupon = buildCouponSnapshot(quote.coupon, quote.discountAmount);
+      discountAmount = quote.discountAmount;
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message || 'Invalid Coupon' });
+    }
+  }
+
+  const totalAmount = roundCurrency(Math.max(subtotal - discountAmount, 0) + shipping + tax);
 
   // Stripe requires smallest currency unit (paise for INR)
   const amountInPaise = Math.round(totalAmount * 100);
@@ -59,6 +106,8 @@ const createPaymentIntent = asyncHandler(async (req, res) => {
     metadata: {
       userId: req.user.id,
       itemCount: enrichedItems.length.toString(),
+      couponCode: coupon?.code || '',
+      couponDiscount: String(discountAmount),
     },
     description: `NexCart order for ${shippingAddress.fullName}`,
   });
@@ -72,6 +121,7 @@ const createPaymentIntent = asyncHandler(async (req, res) => {
     shippingCost: shipping,
     tax,
     totalAmount,
+    coupon,
     paymentStatus: 'pending',
     paymentIntentId: paymentIntent.id,
     paymentMethod: 'stripe',
@@ -83,7 +133,14 @@ const createPaymentIntent = asyncHandler(async (req, res) => {
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     orderId: pendingOrder._id,
-    breakdown: { subtotal, shipping, tax, totalAmount },
+    breakdown: {
+      subtotal,
+      shipping,
+      tax,
+      couponDiscount: discountAmount,
+      totalAmount,
+    },
+    coupon,
   });
 });
 
@@ -127,6 +184,9 @@ const confirmPayment = asyncHandler(async (req, res) => {
 
   // Idempotency: already confirmed (webhook may have fired first)
   if (order.paymentStatus === 'paid') {
+    if (order.coupon?.couponId && !order.couponUsageRecorded) {
+      await recordCouponUsage(order).catch(() => {});
+    }
     return res.status(200).json({ success: true, order, alreadyConfirmed: true });
   }
 
@@ -135,6 +195,11 @@ const confirmPayment = asyncHandler(async (req, res) => {
   order.transactionDate = new Date();
   order.timeline.push({ status: 'pending', timestamp: new Date(), note: 'Payment confirmed via Stripe.' });
   await order.save();
+
+  await recordCouponUsage(order).catch(() => {});
+
+  // Deduct stock now that payment is confirmed
+  await deductStock(order);
 
   return res.status(200).json({ success: true, order });
 });
@@ -201,6 +266,9 @@ async function handlePaymentSuccess(intent) {
     // Idempotency guard
     if (order.paymentStatus === 'paid') {
       console.log(`[Webhook] Order ${order._id} already paid. Skipping.`);
+      if (order.coupon?.couponId && !order.couponUsageRecorded) {
+        await recordCouponUsage(order).catch(() => {});
+      }
       return;
     }
 
@@ -218,6 +286,12 @@ async function handlePaymentSuccess(intent) {
     }
 
     await order.save();
+
+    await recordCouponUsage(order).catch(() => {});
+
+    // Deduct stock — idempotent, won't double-deduct
+    await deductStock(order);
+
     console.log(`[Webhook] Order ${order._id} payment confirmed.`);
   } catch (err) {
     console.error('[Webhook] handlePaymentSuccess error:', err.message);

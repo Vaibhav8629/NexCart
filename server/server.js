@@ -3,10 +3,13 @@ dotenv.config();
 
 const express = require('express');
 const cors = require('cors');
+const passport = require('passport');
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const couponRoutes = require('./routes/couponRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 const { stripeWebhook } = require('./controllers/paymentController');
 const connectDB = require('./config/db');
 
@@ -18,6 +21,7 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:5173',
   'http://localhost:4173',
   'http://127.0.0.1:4173',
+  process.env.CLIENT_URL,
 ]);
 
 app.use(
@@ -31,6 +35,7 @@ app.use(
   })
 );
 app.options('*', cors());
+app.use(passport.initialize());
 
 // ── Stripe webhook MUST receive raw body before express.json() ──────────────
 app.post(
@@ -50,6 +55,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found.' });
