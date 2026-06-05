@@ -1,21 +1,63 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { fetchProductRequest } from '../lib/productApi';
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
 
+const CART_STORAGE_PREFIX = 'nexcart_cart';
+
+const getUserKey = (user) => user?._id || user?.id || user?.email || null;
+
+const getCartStorageKey = (user) => {
+  const userKey = getUserKey(user);
+  return userKey ? `${CART_STORAGE_PREFIX}_${userKey}` : null;
+};
+
+const readStoredCart = (storageKey) => {
+  if (!storageKey) return [];
+
+  try {
+    const stored = localStorage.getItem(storageKey);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
 export const CartProvider = ({ children }) => {
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      const stored = localStorage.getItem('nexcart_cart');
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  const { user, loading } = useAuth();
+  const [cartItems, setCartItems] = useState([]);
+  const activeStorageKeyRef = useRef(null);
 
   useEffect(() => {
-    localStorage.setItem('nexcart_cart', JSON.stringify(cartItems));
+    if (loading) {
+      return;
+    }
+
+    const nextStorageKey = getCartStorageKey(user);
+    const previousStorageKey = activeStorageKeyRef.current;
+
+    if (previousStorageKey && previousStorageKey !== nextStorageKey) {
+      localStorage.removeItem(previousStorageKey);
+    }
+
+    if (!nextStorageKey) {
+      activeStorageKeyRef.current = null;
+      setCartItems([]);
+      return;
+    }
+
+    activeStorageKeyRef.current = nextStorageKey;
+    setCartItems(readStoredCart(nextStorageKey));
+  }, [loading, user]);
+
+  useEffect(() => {
+    if (!activeStorageKeyRef.current) {
+      return;
+    }
+
+    localStorage.setItem(activeStorageKeyRef.current, JSON.stringify(cartItems));
   }, [cartItems]);
 
   const addToCart = (product, quantity = 1) => {
@@ -105,7 +147,7 @@ export const CartProvider = ({ children }) => {
         clearCart,
         validateCartStock,
         cartTotal,
-        cartCount
+        cartCount,
       }}
     >
       {children}

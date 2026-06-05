@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { getProfile } from '../lib/authApi';
 
 const AuthContext = createContext(null);
+const CART_STORAGE_KEY = 'nexcart_cart';
+const WISHLIST_STORAGE_KEY = 'nexcart_wishlist';
 
 const parseStoredUser = (value) => {
   if (!value) {
@@ -15,9 +17,35 @@ const parseStoredUser = (value) => {
   }
 };
 
+const clearLegacyCommerceCache = () => {
+  localStorage.removeItem(CART_STORAGE_KEY);
+  localStorage.removeItem(WISHLIST_STORAGE_KEY);
+};
+
+const getUserStorageKey = (prefix, activeUser) => {
+  const userKey = activeUser?._id || activeUser?.id || activeUser?.email || null;
+  return userKey ? `${prefix}_${userKey}` : null;
+};
+
+const clearUserScopedCommerceCache = (activeUser) => {
+  const cartKey = getUserStorageKey(CART_STORAGE_KEY, activeUser);
+  const wishlistKey = getUserStorageKey(WISHLIST_STORAGE_KEY, activeUser);
+
+  if (cartKey) {
+    localStorage.removeItem(cartKey);
+  }
+
+  if (wishlistKey) {
+    localStorage.removeItem(wishlistKey);
+  }
+};
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => parseStoredUser(localStorage.getItem('nexcart_user')));
   const [token, setToken] = useState(() => localStorage.getItem('nexcart_token'));
+  const [user, setUser] = useState(() => {
+    const storedUser = parseStoredUser(localStorage.getItem('nexcart_user'));
+    return localStorage.getItem('nexcart_token') ? storedUser : null;
+  });
   const [loading, setLoading] = useState(Boolean(localStorage.getItem('nexcart_token')));
 
   useEffect(() => {
@@ -25,6 +53,10 @@ export function AuthProvider({ children }) {
 
     const bootstrap = async () => {
       if (!token) {
+        clearLegacyCommerceCache();
+        clearUserScopedCommerceCache(user);
+        localStorage.removeItem('nexcart_user');
+        setUser(null);
         setLoading(false);
         return;
       }
@@ -43,6 +75,8 @@ export function AuthProvider({ children }) {
         }
       } catch {
         if (!cancelled) {
+          clearUserScopedCommerceCache(user);
+          clearLegacyCommerceCache();
           localStorage.removeItem('nexcart_token');
           localStorage.removeItem('nexcart_user');
           setToken(null);
@@ -65,6 +99,7 @@ export function AuthProvider({ children }) {
   const setSession = useCallback((nextToken, nextUser) => {
     setToken(nextToken);
     setUser(nextUser);
+    clearLegacyCommerceCache();
     localStorage.setItem('nexcart_token', nextToken);
     localStorage.setItem('nexcart_user', JSON.stringify(nextUser));
   }, []);
@@ -76,6 +111,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    clearUserScopedCommerceCache(user);
+    clearLegacyCommerceCache();
     localStorage.removeItem('nexcart_token');
     localStorage.removeItem('nexcart_user');
     setToken(null);

@@ -1,27 +1,66 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { useAuth } from './AuthContext';
 
 const WishlistContext = createContext();
+
+const WISHLIST_STORAGE_PREFIX = 'nexcart_wishlist';
+
+const getUserKey = (user) => user?._id || user?.id || user?.email || null;
+
+const getWishlistStorageKey = (user) => {
+  const userKey = getUserKey(user);
+  return userKey ? `${WISHLIST_STORAGE_PREFIX}_${userKey}` : null;
+};
+
+const readStoredWishlist = (storageKey) => {
+  if (!storageKey) return [];
+
+  try {
+    const saved = localStorage.getItem(storageKey);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
 
 export function useWishlist() {
   return useContext(WishlistContext);
 }
 
 export function WishlistProvider({ children }) {
-  const [wishlistItems, setWishlistItems] = useState(() => {
-    const saved = localStorage.getItem('nexcart_wishlist');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
+  const { user, loading } = useAuth();
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const activeStorageKeyRef = useRef(null);
 
   useEffect(() => {
-    localStorage.setItem('nexcart_wishlist', JSON.stringify(wishlistItems));
+    if (loading) {
+      return;
+    }
+
+    const nextStorageKey = getWishlistStorageKey(user);
+    const previousStorageKey = activeStorageKeyRef.current;
+
+    if (previousStorageKey && previousStorageKey !== nextStorageKey) {
+      localStorage.removeItem(previousStorageKey);
+    }
+
+    if (!nextStorageKey) {
+      activeStorageKeyRef.current = null;
+      setWishlistItems([]);
+      return;
+    }
+
+    activeStorageKeyRef.current = nextStorageKey;
+    setWishlistItems(readStoredWishlist(nextStorageKey));
+  }, [loading, user]);
+
+  useEffect(() => {
+    if (!activeStorageKeyRef.current) {
+      return;
+    }
+
+    localStorage.setItem(activeStorageKeyRef.current, JSON.stringify(wishlistItems));
   }, [wishlistItems]);
 
   const addToWishlist = (product) => {
@@ -62,6 +101,7 @@ export function WishlistProvider({ children }) {
   const wishlistCount = wishlistItems.length;
 
   const value = {
+    wishlist: wishlistItems,
     wishlistItems,
     addToWishlist,
     removeFromWishlist,
