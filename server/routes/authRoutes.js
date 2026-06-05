@@ -5,9 +5,9 @@ const { passport, isGoogleOAuthConfigured } = require('../config/passport');
 
 const router = express.Router();
 
-const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+const getClientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
 
-const redirectToLoginWithOauthError = (res) => res.redirect(`${clientUrl}/login?oauth=error`);
+const redirectToLoginWithOauthError = (res) => res.redirect(`${getClientUrl()}/login?oauth=error`);
 
 const googleLoginHandler = (req, res, next) => {
 	if (!isGoogleOAuthConfigured) {
@@ -24,7 +24,7 @@ const googleCallbackHandler = (req, res, next) => {
 
 	return passport.authenticate('google', {
 		session: false,
-		failureRedirect: `${clientUrl}/login?oauth=error`,
+		failureRedirect: `${getClientUrl()}/login?oauth=error`,
 	})(req, res, next);
 };
 

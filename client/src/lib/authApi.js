@@ -1,9 +1,23 @@
 import apiClient from './apiClient';
 
 const parseApiError = (error) => error?.response?.data?.message || error.message || 'Request failed.';
-const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
-export const getGoogleAuthUrl = () => `${apiBaseUrl}/auth/google`;
+/**
+ * Returns the full Google OAuth initiation URL on the Render backend.
+ *
+ * VITE_API_URL is expected to be "https://nexcart-66az.onrender.com/api"
+ * → result: "https://nexcart-66az.onrender.com/api/auth/google"
+ *
+ * This function intentionally reads the env var at call time (not module
+ * load time) so Vite's static replacement is always applied correctly.
+ */
+export const getGoogleAuthUrl = () => {
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+  if (!base) {
+    throw new Error('VITE_API_URL is not defined. Google sign-in cannot proceed.');
+  }
+  return `${base}/auth/google`;
+};
 
 export const registerUser = async (formData) => {
   try {

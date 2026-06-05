@@ -66,7 +66,13 @@ export default function AuthPage({ mode }) {
     }
   }, [isAuthenticated, navigate, user]);
 
-  const handleGoogleSignIn = () => window.location.assign(getGoogleAuthUrl());
+  const handleGoogleSignIn = () => {
+    try {
+      window.location.assign(getGoogleAuthUrl());
+    } catch (err) {
+      toast.error(err.message || 'Google sign-in is unavailable.');
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
