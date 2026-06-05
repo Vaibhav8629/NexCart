@@ -3,11 +3,13 @@ import apiClient from './apiClient';
 const parseApiError = (error) => error?.response?.data?.message || error.message || 'Request failed.';
 const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
-export const getGoogleAuthUrl = () => `${apiBaseUrl}/api/auth/google`;
+export const getGoogleAuthUrl = () => `${apiBaseUrl}/auth/google`;
 
 export const registerUser = async (formData) => {
   try {
-    const { data } = await apiClient.post('/auth/register', formData);
+    const { data
+
+     } = await apiClient.post('/auth/register', formData);
     return data;
   } catch (error) {
     throw new Error(parseApiError(error), { cause: error });
